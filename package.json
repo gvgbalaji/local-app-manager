@@ -1,0 +1,34 @@
+{
+  "name": "local-app-manager",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop app for managing locally running applications",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k -n tsc,vite,electron \"npm:dev:tsc\" \"npm:dev:vite\" \"npm:dev:electron\"",
+    "dev:tsc": "tsc -p electron/tsconfig.json --watch --preserveWatchOutput",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on http://localhost:5173 dist-electron/main.js dist-electron/preload.js && cross-env NODE_ENV=development electron .",
+    "build": "tsc -p electron/tsconfig.json && vite build",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit && tsc -p electron/tsconfig.json --noEmit",
+    "test:main": "node --test --import tsx electron/**/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^30.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
