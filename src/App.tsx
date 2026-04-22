@@ -100,7 +100,7 @@ export default function App(): JSX.Element {
       {(addOpen || editingId) && (
         <AddAppDialog
           editing={editingId ? apps.find(a => a.id === editingId) ?? null : null}
-          existingPorts={apps.map(a => ({ id: a.id, port: a.port }))}
+          existingPorts={apps.map(a => ({ id: a.id, port: a.port, name: a.name }))}
           onClose={() => { setAddOpen(false); setEditingId(null); }}
           onSaved={async () => { setAddOpen(false); setEditingId(null); await reload(); }}
           showError={showError}

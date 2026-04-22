@@ -3,7 +3,7 @@ import type { AppConfig } from '../global';
 
 interface Props {
   editing?: AppConfig | null;
-  existingPorts: { id: string; port: number }[];
+  existingPorts: { id: string; port: number; name: string }[];
   onClose: () => void;
   onSaved: () => void;
   showError: (e: unknown) => void;
@@ -18,18 +18,22 @@ export default function AddAppDialog({ editing, existingPorts, onClose, onSaved,
   const portNum = Number(port);
   const portValid =
     port !== '' && Number.isInteger(portNum) && portNum >= 1 && portNum <= 65535;
-  const portDup = portValid && existingPorts.some(p => p.port === portNum && p.id !== editing?.id);
+  const dupApp = portValid
+    ? existingPorts.find(p => p.port === portNum && p.id !== editing?.id)
+    : undefined;
 
   let portError = '';
   if (port !== '' && !portValid) portError = 'Port must be an integer 1–65535';
-  else if (portDup) portError = 'Port already registered — use a different port';
 
   const canSave =
-    name.trim() !== '' && command.trim() !== '' && portValid && !portDup && !submitting;
+    name.trim() !== '' && command.trim() !== '' && portValid && !submitting;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSave) return;
+    if (dupApp && !confirm(`Port ${portNum} is already used by app "${dupApp.name}". Do you still want to add this app?`)) {
+      return;
+    }
     setSubmitting(true);
     try {
       const input = { name: name.trim(), command: command.trim(), port: portNum };
@@ -74,6 +78,9 @@ export default function AddAppDialog({ editing, existingPorts, onClose, onSaved,
             max={65535}
           />
           {portError && <span className="field-error">{portError}</span>}
+          {!portError && dupApp && (
+            <span className="field-warn">Port already used by "{dupApp.name}" — you'll be asked to confirm.</span>
+          )}
         </label>
         {editing && (
           <p className="hint">

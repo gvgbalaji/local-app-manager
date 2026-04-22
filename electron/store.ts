@@ -40,9 +40,6 @@ export function saveApps(apps: AppConfig[]): void {
 
 export function registerApp(input: { name: string; command: string; port: number }): AppConfig {
   const apps = listApps();
-  if (apps.some(a => a.port === input.port)) {
-    throw new Error(`Port ${input.port} is already registered to another app`);
-  }
   if (!input.name.trim()) throw new Error('Name is required');
   if (!input.command.trim()) throw new Error('Command is required');
   if (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535) {
@@ -67,9 +64,6 @@ export function updateApp(
   const apps = listApps();
   const idx = apps.findIndex(a => a.id === id);
   if (idx === -1) throw new Error('App not found');
-  if (apps.some(a => a.id !== id && a.port === input.port)) {
-    throw new Error(`Port ${input.port} is already registered to another app`);
-  }
   if (!input.name.trim()) throw new Error('Name is required');
   if (!input.command.trim()) throw new Error('Command is required');
   if (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535) {
