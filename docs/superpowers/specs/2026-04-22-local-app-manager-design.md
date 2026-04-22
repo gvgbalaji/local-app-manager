@@ -60,7 +60,7 @@ Using Tauri's platform-appropriate paths:
   - Combined stdout + stderr.
   - Ring buffered at 10 MB. On rollover, rename to `<appId>.log.1` (one backup kept).
 
-On Linux these resolve under `~/.config/` and `~/.local/share/`; on macOS under `~/Library/Application Support/` and `~/Library/Preferences/`.
+On Linux these resolve under `~/.config/<bundle>/` (config) and `~/.local/share/<bundle>/` (data); on macOS both resolve under `~/Library/Application Support/<bundle>/`.
 
 ## Core Flows
 
