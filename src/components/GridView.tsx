@@ -4,6 +4,9 @@ interface Props {
   apps: AppConfig[];
   statuses: Record<string, AppStatusInfo>;
   onOpen: (id: string) => void;
+  onStart: (id: string) => void;
+  onStop: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
 function gradientFor(name: string): string {
@@ -14,14 +17,15 @@ function gradientFor(name: string): string {
   return `linear-gradient(135deg, hsl(${h1} 70% 60%), hsl(${h2} 70% 55%))`;
 }
 
-export default function GridView({ apps, statuses, onOpen }: Props): JSX.Element {
+export default function GridView({ apps, statuses, onOpen, onStart, onStop, onDelete }: Props): JSX.Element {
   return (
     <div className="grid">
       {apps.map(app => {
         const st = statuses[app.id];
         const running = st?.status === 'running';
+        const stop = (e: React.MouseEvent) => e.stopPropagation();
         return (
-          <button
+          <div
             key={app.id}
             className="tile"
             onClick={() => onOpen(app.id)}
@@ -32,7 +36,15 @@ export default function GridView({ apps, statuses, onOpen }: Props): JSX.Element
             </div>
             <div className="tile-name">{app.name}</div>
             <div className={`status-dot ${running ? 'running' : 'stopped'}`} />
-          </button>
+            <div className="tile-actions" onClick={stop}>
+              {running ? (
+                <button onClick={() => onStop(app.id)} title="Stop">■</button>
+              ) : (
+                <button onClick={() => onStart(app.id)} title="Start">▶</button>
+              )}
+              <button onClick={() => onDelete(app.id)} title="Delete" className="danger">🗑</button>
+            </div>
+          </div>
         );
       })}
     </div>

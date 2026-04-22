@@ -77,7 +77,14 @@ export default function App(): JSX.Element {
             <button onClick={() => setAddOpen(true)}>+ Add your first app</button>
           </div>
         ) : view === 'grid' ? (
-          <GridView apps={apps} statuses={statuses} onOpen={setSelectedId} />
+          <GridView
+            apps={apps}
+            statuses={statuses}
+            onOpen={setSelectedId}
+            onStart={onStart}
+            onStop={onStop}
+            onDelete={onDelete}
+          />
         ) : (
           <ListView
             apps={apps}
@@ -85,6 +92,7 @@ export default function App(): JSX.Element {
             onOpen={setSelectedId}
             onStart={onStart}
             onStop={onStop}
+            onDelete={onDelete}
           />
         )}
       </main>

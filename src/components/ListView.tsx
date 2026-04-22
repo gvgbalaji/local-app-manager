@@ -6,6 +6,7 @@ interface Props {
   onOpen: (id: string) => void;
   onStart: (id: string) => void;
   onStop: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
 function uptime(startedAt: string | null): string {
@@ -19,7 +20,7 @@ function uptime(startedAt: string | null): string {
   return `${h}h ${m % 60}m`;
 }
 
-export default function ListView({ apps, statuses, onOpen, onStart, onStop }: Props): JSX.Element {
+export default function ListView({ apps, statuses, onOpen, onStart, onStop, onDelete }: Props): JSX.Element {
   return (
     <table className="list">
       <thead>
@@ -45,7 +46,7 @@ export default function ListView({ apps, statuses, onOpen, onStart, onStop }: Pr
                 ) : (
                   <button onClick={() => onStart(app.id)} title="Start">▶</button>
                 )}
-                <button onClick={() => onOpen(app.id)} title="Details">📋</button>
+                <button onClick={() => onDelete(app.id)} title="Delete" className="danger">🗑</button>
               </td>
             </tr>
           );
