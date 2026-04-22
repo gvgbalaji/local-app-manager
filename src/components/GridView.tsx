@@ -35,6 +35,7 @@ export default function GridView({ apps, statuses, onOpen, onStart, onStop, onDe
               {app.name.charAt(0).toUpperCase()}
             </div>
             <div className="tile-name">{app.name}</div>
+            <div className="tile-port">:{app.port}</div>
             <div className={`status-dot ${running ? 'running' : 'stopped'}`} />
             <div className="tile-actions" onClick={stop}>
               {running ? (
