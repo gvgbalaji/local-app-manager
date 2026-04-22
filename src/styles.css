@@ -76,8 +76,21 @@ button.danger:hover:not(:disabled) { background: var(--red); color: white; }
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 .tile-name { font-size: 12px; text-align: center; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tile-actions { display: flex; gap: 4px; margin-top: 4px; }
-.tile-actions button { padding: 2px 8px; font-size: 12px; }
+.tile-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.icon-btn:hover:not(:disabled) { background: var(--border); color: white; }
+.icon-btn.danger-soft { color: var(--muted); }
+.icon-btn.danger-soft:hover:not(:disabled) { background: var(--red); color: white; border-color: var(--red); }
+
+.list .icon-btn { width: 28px; height: 28px; margin-right: 4px; }
 
 .status-dot {
   width: 8px; height: 8px; border-radius: 50%; display: inline-block;
