@@ -1,22 +1,24 @@
 import { useState } from 'react';
+import type { AppConfig } from '../global';
 
 interface Props {
-  existingPorts: number[];
+  editing?: AppConfig | null;
+  existingPorts: { id: string; port: number }[];
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
   showError: (e: unknown) => void;
 }
 
-export default function AddAppDialog({ existingPorts, onClose, onCreated, showError }: Props): JSX.Element {
-  const [name, setName] = useState('');
-  const [command, setCommand] = useState('');
-  const [port, setPort] = useState('');
+export default function AddAppDialog({ editing, existingPorts, onClose, onSaved, showError }: Props): JSX.Element {
+  const [name, setName] = useState(editing?.name ?? '');
+  const [command, setCommand] = useState(editing?.command ?? '');
+  const [port, setPort] = useState(editing ? String(editing.port) : '');
   const [submitting, setSubmitting] = useState(false);
 
   const portNum = Number(port);
   const portValid =
     port !== '' && Number.isInteger(portNum) && portNum >= 1 && portNum <= 65535;
-  const portDup = portValid && existingPorts.includes(portNum);
+  const portDup = portValid && existingPorts.some(p => p.port === portNum && p.id !== editing?.id);
 
   let portError = '';
   if (port !== '' && !portValid) portError = 'Port must be an integer 1–65535';
@@ -30,8 +32,10 @@ export default function AddAppDialog({ existingPorts, onClose, onCreated, showEr
     if (!canSave) return;
     setSubmitting(true);
     try {
-      await window.api.register({ name: name.trim(), command: command.trim(), port: portNum });
-      onCreated();
+      const input = { name: name.trim(), command: command.trim(), port: portNum };
+      if (editing) await window.api.update(editing.id, input);
+      else await window.api.register(input);
+      onSaved();
     } catch (err) {
       showError(err);
       setSubmitting(false);
@@ -41,7 +45,7 @@ export default function AddAppDialog({ existingPorts, onClose, onCreated, showEr
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <form className="modal" onClick={e => e.stopPropagation()} onSubmit={submit}>
-        <h2>Add App</h2>
+        <h2>{editing ? 'Edit App' : 'Add App'}</h2>
         <label>
           Name
           <input
@@ -71,6 +75,11 @@ export default function AddAppDialog({ existingPorts, onClose, onCreated, showEr
           />
           {portError && <span className="field-error">{portError}</span>}
         </label>
+        {editing && (
+          <p className="hint">
+            Note: edits take effect on the next start. A running process keeps running with its original command/port until stopped.
+          </p>
+        )}
         <div className="modal-actions">
           <button type="button" onClick={onClose}>Cancel</button>
           <button type="submit" disabled={!canSave}>Save</button>

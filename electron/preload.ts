@@ -20,6 +20,8 @@ const api = {
     ipcRenderer.invoke('apps:list'),
   register: (input: { name: string; command: string; port: number }): Promise<AppConfig> =>
     ipcRenderer.invoke('apps:register', input),
+  update: (id: string, input: { name: string; command: string; port: number }): Promise<AppConfig> =>
+    ipcRenderer.invoke('apps:update', id, input),
   remove: (id: string): Promise<boolean> => ipcRenderer.invoke('apps:delete', id),
   start: (id: string): Promise<AppStatusInfo> => ipcRenderer.invoke('apps:start', id),
   stop: (id: string): Promise<AppStatusInfo> => ipcRenderer.invoke('apps:stop', id),

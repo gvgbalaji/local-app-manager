@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron';
-import { listApps, registerApp, deleteApp, AppConfig } from './store';
+import { listApps, registerApp, updateApp, deleteApp, AppConfig } from './store';
 import {
   startApp,
   stopApp,
@@ -22,6 +22,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     'apps:register',
     (_e, input: { name: string; command: string; port: number }): AppConfig =>
       registerApp(input)
+  );
+
+  ipcMain.handle(
+    'apps:update',
+    (_e, id: string, input: { name: string; command: string; port: number }): AppConfig =>
+      updateApp(id, input)
   );
 
   ipcMain.handle('apps:delete', (_e, id: string) => {

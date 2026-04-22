@@ -16,6 +16,7 @@ export interface AppStatusInfo {
 export interface Api {
   list(): Promise<{ apps: AppConfig[]; statuses: Record<string, AppStatusInfo> }>;
   register(input: { name: string; command: string; port: number }): Promise<AppConfig>;
+  update(id: string, input: { name: string; command: string; port: number }): Promise<AppConfig>;
   remove(id: string): Promise<boolean>;
   start(id: string): Promise<AppStatusInfo>;
   stop(id: string): Promise<AppStatusInfo>;

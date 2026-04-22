@@ -8,9 +8,10 @@ interface Props {
   onStart: () => void;
   onStop: () => void;
   onDelete: () => void;
+  onEdit: () => void;
 }
 
-export default function DetailPanel({ app, status, onClose, onStart, onStop, onDelete }: Props): JSX.Element {
+export default function DetailPanel({ app, status, onClose, onStart, onStop, onDelete, onEdit }: Props): JSX.Element {
   const [logs, setLogs] = useState('');
   const [pinBottom, setPinBottom] = useState(true);
   const logsRef = useRef<HTMLPreElement | null>(null);
@@ -56,7 +57,8 @@ export default function DetailPanel({ app, status, onClose, onStart, onStop, onD
           {running
             ? <button onClick={onStop}>Stop</button>
             : <button onClick={onStart}>Start</button>}
-          <button onClick={onDelete} className="danger" disabled={running} title={running ? 'Stop first' : ''}>Delete</button>
+          <button onClick={onEdit}>Edit</button>
+          <button onClick={onDelete} className="danger">Delete</button>
         </div>
         <div className="logs-header">
           <strong>Logs</strong>

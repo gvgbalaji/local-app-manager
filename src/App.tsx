@@ -15,6 +15,7 @@ export default function App(): JSX.Element {
     (localStorage.getItem('view') as ViewMode) || 'grid'
   );
   const [addOpen, setAddOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -47,8 +48,15 @@ export default function App(): JSX.Element {
     try { await window.api.stop(id); await reload(); } catch (e) { showError(e); }
   };
   const onDelete = async (id: string) => {
-    if (!confirm('Delete this app?')) return;
+    const isRunning = statuses[id]?.status === 'running';
+    const msg = isRunning
+      ? 'This app is running. Stop it and delete?'
+      : 'Delete this app?';
+    if (!confirm(msg)) return;
     try {
+      if (isRunning) {
+        try { await window.api.stop(id); } catch (e) { showError(e); return; }
+      }
       await window.api.remove(id);
       if (selectedId === id) setSelectedId(null);
       await reload();
@@ -81,11 +89,12 @@ export default function App(): JSX.Element {
         )}
       </main>
 
-      {addOpen && (
+      {(addOpen || editingId) && (
         <AddAppDialog
-          existingPorts={apps.map(a => a.port)}
-          onClose={() => setAddOpen(false)}
-          onCreated={async () => { setAddOpen(false); await reload(); }}
+          editing={editingId ? apps.find(a => a.id === editingId) ?? null : null}
+          existingPorts={apps.map(a => ({ id: a.id, port: a.port }))}
+          onClose={() => { setAddOpen(false); setEditingId(null); }}
+          onSaved={async () => { setAddOpen(false); setEditingId(null); await reload(); }}
           showError={showError}
         />
       )}
@@ -98,6 +107,7 @@ export default function App(): JSX.Element {
           onStart={() => onStart(selected.id)}
           onStop={() => onStop(selected.id)}
           onDelete={() => onDelete(selected.id)}
+          onEdit={() => setEditingId(selected.id)}
         />
       )}
 

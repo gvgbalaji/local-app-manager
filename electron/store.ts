@@ -60,6 +60,31 @@ export function registerApp(input: { name: string; command: string; port: number
   return entry;
 }
 
+export function updateApp(
+  id: string,
+  input: { name: string; command: string; port: number }
+): AppConfig {
+  const apps = listApps();
+  const idx = apps.findIndex(a => a.id === id);
+  if (idx === -1) throw new Error('App not found');
+  if (apps.some(a => a.id !== id && a.port === input.port)) {
+    throw new Error(`Port ${input.port} is already registered to another app`);
+  }
+  if (!input.name.trim()) throw new Error('Name is required');
+  if (!input.command.trim()) throw new Error('Command is required');
+  if (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535) {
+    throw new Error('Port must be an integer between 1 and 65535');
+  }
+  apps[idx] = {
+    ...apps[idx],
+    name: input.name.trim(),
+    command: input.command.trim(),
+    port: input.port,
+  };
+  saveApps(apps);
+  return apps[idx];
+}
+
 export function deleteApp(id: string): void {
   saveApps(listApps().filter(a => a.id !== id));
   const st = readState();

@@ -83,7 +83,7 @@ function rotateIfLarge(file: string, backup: string): void {
 export function statusOf(app: AppConfig): AppStatusInfo {
   const st = readState();
   const entry = st[app.id];
-  if (entry && pidAlive(entry.pid) && portBound(app.port)) {
+  if (entry && pidAlive(entry.pid)) {
     return { id: app.id, status: 'running', startedAt: entry.startedAt, pid: entry.pid };
   }
   if (entry) clearStateEntry(app.id);
