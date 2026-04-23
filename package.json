@@ -4,12 +4,15 @@
   "private": true,
   "description": "Desktop app for managing locally running applications",
   "main": "dist-electron/main.js",
+  "bin": {
+    "local-app": "dist-electron/cli.js"
+  },
   "scripts": {
     "dev": "concurrently -k -n tsc,vite,electron \"npm:dev:tsc\" \"npm:dev:vite\" \"npm:dev:electron\"",
     "dev:tsc": "tsc -p electron/tsconfig.json --watch --preserveWatchOutput",
     "dev:vite": "vite",
     "dev:electron": "wait-on http://localhost:5173 dist-electron/main.js dist-electron/preload.js && cross-env NODE_ENV=development electron .",
-    "build": "tsc -p electron/tsconfig.json && vite build",
+    "build": "tsc -p electron/tsconfig.json && node -e \"require('fs').chmodSync('dist-electron/cli.js', 0o755)\" && vite build",
     "start": "electron .",
     "typecheck": "tsc --noEmit && tsc -p electron/tsconfig.json --noEmit",
     "test:main": "node --test --import tsx electron/**/*.test.ts"
