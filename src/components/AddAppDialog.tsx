@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AppConfig } from '../global';
+import type { AppConfig, AppType } from '../global';
 
 interface Props {
   editing?: AppConfig | null;
@@ -13,6 +13,7 @@ export default function AddAppDialog({ editing, existingPorts, onClose, onSaved,
   const [name, setName] = useState(editing?.name ?? '');
   const [command, setCommand] = useState(editing?.command ?? '');
   const [port, setPort] = useState(editing ? String(editing.port) : '');
+  const [appType, setAppType] = useState<AppType>(editing?.appType ?? 'web');
   const [submitting, setSubmitting] = useState(false);
 
   const portNum = Number(port);
@@ -36,7 +37,7 @@ export default function AddAppDialog({ editing, existingPorts, onClose, onSaved,
     }
     setSubmitting(true);
     try {
-      const input = { name: name.trim(), command: command.trim(), port: portNum };
+      const input = { name: name.trim(), command: command.trim(), port: portNum, appType };
       if (editing) await window.api.update(editing.id, input);
       else await window.api.register(input);
       onSaved();
@@ -66,6 +67,13 @@ export default function AddAppDialog({ editing, existingPorts, onClose, onSaved,
             onChange={e => setCommand(e.target.value)}
             placeholder="e.g. npm start"
           />
+        </label>
+        <label>
+          Type
+          <select value={appType} onChange={e => setAppType(e.target.value as AppType)}>
+            <option value="web">Web</option>
+            <option value="desktop">Desktop</option>
+          </select>
         </label>
         <label>
           Port

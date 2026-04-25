@@ -2,11 +2,14 @@ import * as fs from 'fs';
 import { randomUUID } from 'crypto';
 import { appsJsonPath, stateJsonPath } from './paths';
 
+export type AppType = 'web' | 'desktop';
+
 export interface AppConfig {
   id: string;
   name: string;
   command: string;
   port: number;
+  appType: AppType;
   createdAt: string;
 }
 
@@ -31,14 +34,15 @@ function writeJson(p: string, data: unknown): void {
 }
 
 export function listApps(): AppConfig[] {
-  return readJson<AppConfig[]>(appsJsonPath(), []);
+  const apps = readJson<AppConfig[]>(appsJsonPath(), []);
+  return apps.map(a => ({ ...a, appType: (a.appType ?? 'web') as AppType }));
 }
 
 export function saveApps(apps: AppConfig[]): void {
   writeJson(appsJsonPath(), apps);
 }
 
-export function registerApp(input: { name: string; command: string; port: number }): AppConfig {
+export function registerApp(input: { name: string; command: string; port: number; appType?: AppType }): AppConfig {
   const apps = listApps();
   if (!input.name.trim()) throw new Error('Name is required');
   if (!input.command.trim()) throw new Error('Command is required');
@@ -50,6 +54,7 @@ export function registerApp(input: { name: string; command: string; port: number
     name: input.name.trim(),
     command: input.command.trim(),
     port: input.port,
+    appType: input.appType ?? 'web',
     createdAt: new Date().toISOString(),
   };
   apps.push(entry);
@@ -59,7 +64,7 @@ export function registerApp(input: { name: string; command: string; port: number
 
 export function updateApp(
   id: string,
-  input: { name: string; command: string; port: number }
+  input: { name: string; command: string; port: number; appType?: AppType }
 ): AppConfig {
   const apps = listApps();
   const idx = apps.findIndex(a => a.id === id);
@@ -74,6 +79,7 @@ export function updateApp(
     name: input.name.trim(),
     command: input.command.trim(),
     port: input.port,
+    appType: input.appType ?? apps[idx].appType ?? 'web',
   };
   saveApps(apps);
   return apps[idx];

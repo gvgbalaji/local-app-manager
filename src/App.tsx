@@ -47,6 +47,10 @@ export default function App(): JSX.Element {
   const onStop = async (id: string) => {
     try { await window.api.stop(id); await reload(); } catch (e) { showError(e); }
   };
+  const onOpen = async (id: string) => {
+    try { await window.api.openApp(id); } catch (e) { showError(e); }
+  };
+
   const onDelete = async (id: string) => {
     const isRunning = statuses[id]?.status === 'running';
     const msg = isRunning
@@ -80,7 +84,8 @@ export default function App(): JSX.Element {
           <GridView
             apps={apps}
             statuses={statuses}
-            onOpen={setSelectedId}
+            onOpen={onOpen}
+            onInfo={setSelectedId}
             onStart={onStart}
             onStop={onStop}
             onDelete={onDelete}
@@ -89,7 +94,8 @@ export default function App(): JSX.Element {
           <ListView
             apps={apps}
             statuses={statuses}
-            onOpen={setSelectedId}
+            onOpen={onOpen}
+            onInfo={setSelectedId}
             onStart={onStart}
             onStop={onStop}
             onDelete={onDelete}

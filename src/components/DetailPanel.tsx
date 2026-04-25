@@ -47,6 +47,7 @@ export default function DetailPanel({ app, status, onClose, onStart, onStop, onD
       <div className="slideover-body">
         <div className="field"><label>Command</label><code>{app.command}</code></div>
         <div className="field"><label>Port</label><code>{app.port}</code></div>
+        <div className="field"><label>Type</label><code>{app.appType === 'desktop' ? 'Desktop' : 'Web'}</code></div>
         <div className="field">
           <label>Status</label>
           <span className={running ? 'running' : 'stopped'}>
