@@ -4,3 +4,4 @@ dist-electron/
 .superpowers/
 *.log
 .DS_Store
+local-app-manager-config.json

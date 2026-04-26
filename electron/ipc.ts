@@ -1,6 +1,12 @@
-import { ipcMain, BrowserWindow, shell } from 'electron';
+import { ipcMain, BrowserWindow, shell, dialog } from 'electron';
 import { exec } from 'child_process';
-import { listApps, registerApp, updateApp, deleteApp, AppConfig, readState } from './store';
+import * as fs from 'fs';
+import {
+  listApps, registerApp, updateApp, deleteApp, AppConfig, readState,
+  listGroups, createGroup, deleteGroup, addAppToGroup, removeAppFromGroup, renameGroup,
+  saveApps, saveGroups,
+} from './store';
+import { readSettings, writeSettings, Settings } from './settings';
 import {
   startApp,
   stopApp,
@@ -8,6 +14,7 @@ import {
   startTail,
   stopTail,
   logEvents,
+  reanalyzeApp,
   AppStatusInfo,
 } from './processManager';
 
@@ -16,7 +23,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     const apps = listApps();
     const statuses: Record<string, AppStatusInfo> = {};
     for (const a of apps) statuses[a.id] = statusOf(a);
-    return { apps, statuses };
+    const groups = listGroups();
+    return { apps, statuses, groups };
   });
 
   ipcMain.handle(
@@ -44,9 +52,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     if (app.appType === 'desktop') {
       const entry = readState()[id];
       if (!entry?.pid) return;
-      // Desktop apps often call setsid() and break out of the stored process group.
-      // Recursively walk the process tree from the stored PID to find all descendants,
-      // then try wmctrl (GNOME-friendly, handles minimized windows) then xdotool.
       const script = `
 get_descendants() {
   echo $1
@@ -78,6 +83,85 @@ fi
     const a = listApps().find(x => x.id === id);
     return a ? statusOf(a) : null;
   });
+
+  // --- Groups ---
+
+  ipcMain.handle('groups:create', (_e, name: string) => createGroup(name));
+
+  ipcMain.handle('groups:delete', (_e, id: string) => {
+    deleteGroup(id);
+    return true;
+  });
+
+  ipcMain.handle('groups:rename', (_e, id: string, name: string) => renameGroup(id, name));
+
+  ipcMain.handle('groups:add-app', (_e, groupId: string, appId: string) =>
+    addAppToGroup(groupId, appId)
+  );
+
+  ipcMain.handle('groups:remove-app', (_e, groupId: string, appId: string) =>
+    removeAppFromGroup(groupId, appId)
+  );
+
+  ipcMain.handle('groups:start', async (_e, groupId: string) => {
+    const group = listGroups().find(g => g.id === groupId);
+    if (!group) throw new Error('Group not found');
+    const results: AppStatusInfo[] = [];
+    for (const appId of group.appIds) {
+      try { results.push(await startApp(appId)); } catch { /* ignore individual failures */ }
+    }
+    return results;
+  });
+
+  ipcMain.handle('groups:stop', async (_e, groupId: string) => {
+    const group = listGroups().find(g => g.id === groupId);
+    if (!group) throw new Error('Group not found');
+    const results: AppStatusInfo[] = [];
+    for (const appId of group.appIds) {
+      try { results.push(await stopApp(appId)); } catch { /* ignore individual failures */ }
+    }
+    return results;
+  });
+
+  // --- Config export / import ---
+
+  ipcMain.handle('config:export', async () => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: 'local-app-manager-config.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return false;
+    const data = { version: 1, apps: listApps(), groups: listGroups() };
+    fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2));
+    return true;
+  });
+
+  ipcMain.handle('config:import', async () => {
+    const result = await dialog.showOpenDialog({
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || !result.filePaths[0]) return false;
+    const raw = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8')) as {
+      apps?: unknown;
+      groups?: unknown;
+    };
+    if (!raw.apps || !Array.isArray(raw.apps)) throw new Error('Invalid config file: missing apps array');
+    saveApps(raw.apps as Parameters<typeof saveApps>[0]);
+    saveGroups(Array.isArray(raw.groups) ? raw.groups as Parameters<typeof saveGroups>[0] : []);
+    return true;
+  });
+
+  // --- Settings ---
+
+  ipcMain.handle('settings:read', () => readSettings());
+  ipcMain.handle('settings:write', (_e, s: Settings) => { writeSettings(s); return true; });
+
+  // --- AI ---
+
+  ipcMain.handle('ai:reanalyze', (_e, id: string) => reanalyzeApp(id));
+
+  // --- Logs ---
 
   ipcMain.handle('logs:subscribe', (_e, id: string) => {
     const { initial } = startTail(id);

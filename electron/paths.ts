@@ -28,6 +28,14 @@ export function stateJsonPath(): string {
   return path.join(dataDir(), 'state.json');
 }
 
+export function groupsJsonPath(): string {
+  return path.join(configDir(), 'groups.json');
+}
+
+export function settingsJsonPath(): string {
+  return path.join(configDir(), 'settings.json');
+}
+
 export function logFilePath(appId: string): string {
   return path.join(logsDir(), `${appId}.log`);
 }

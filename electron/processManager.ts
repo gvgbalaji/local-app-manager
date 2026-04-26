@@ -1,6 +1,7 @@
 import { spawn, execSync } from 'child_process';
 import * as fs from 'fs';
 import { EventEmitter } from 'events';
+import { dialog } from 'electron';
 import { logFilePath, logBackupPath } from './paths';
 import {
   AppConfig,
@@ -8,7 +9,11 @@ import {
   readState,
   setStateEntry,
   clearStateEntry,
+  setDetectedPorts,
+  updateAppPort,
 } from './store';
+import { readSettings } from './settings';
+import { analyzeLogsForPorts, analyzeFailure } from './aiAnalyzer';
 
 const LOG_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -19,9 +24,13 @@ export interface AppStatusInfo {
   status: AppStatus;
   startedAt: string | null;
   pid: number | null;
+  aiAnalysis?: { reason: string; action: string } | null;
 }
 
 export const logEvents = new EventEmitter();
+
+// In-memory failure analysis — cleared on each start
+const aiAnalysisMap = new Map<string, { reason: string; action: string }>();
 
 function pidAlive(pid: number): boolean {
   try {
@@ -80,14 +89,111 @@ function rotateIfLarge(file: string, backup: string): void {
   } catch { /* file may not exist yet */ }
 }
 
+// Write a message into the app's own log file so it appears in the DetailPanel log viewer
+function appendToAppLog(appId: string, msg: string): void {
+  const line = `\n[AI] ${new Date().toISOString()} ${msg}\n`;
+  try { fs.appendFileSync(logFilePath(appId), line); } catch { /* ignore */ }
+  // Also emit directly in case no tail watcher is running
+  logEvents.emit(`log:${appId}`, line);
+}
+
 export function statusOf(app: AppConfig): AppStatusInfo {
   const st = readState();
   const entry = st[app.id];
   if (entry && pidAlive(entry.pid)) {
-    return { id: app.id, status: 'running', startedAt: entry.startedAt, pid: entry.pid };
+    return { id: app.id, status: 'running', startedAt: entry.startedAt, pid: entry.pid, aiAnalysis: null };
   }
   if (entry) clearStateEntry(app.id);
-  return { id: app.id, status: 'stopped', startedAt: null, pid: null };
+  return {
+    id: app.id, status: 'stopped', startedAt: null, pid: null,
+    aiAnalysis: aiAnalysisMap.get(app.id) ?? null,
+  };
+}
+
+async function doAiAnalysis(app: AppConfig): Promise<void> {
+  const log = (msg: string) => appendToAppLog(app.id, msg);
+  const settings = readSettings();
+
+  if (!settings.aiEnabled) {
+    log('AI analysis skipped: AI is not enabled (enable in Settings)');
+    return;
+  }
+  if (!settings.groqApiKey) {
+    log('AI analysis skipped: Groq API key not configured (add in Settings)');
+    return;
+  }
+
+  let logs = '';
+  try { logs = fs.readFileSync(logFilePath(app.id), 'utf8'); } catch {
+    log('AI analysis error: could not read log file');
+    return;
+  }
+  if (!logs.trim()) {
+    log('AI analysis skipped: log file is empty');
+    return;
+  }
+
+  const current = statusOf(app);
+  log(`Starting AI analysis — app status: ${current.status}, log size: ${logs.length} chars`);
+
+  if (current.status === 'running') {
+    try {
+      log('--- Port detection ---');
+      const ports = await analyzeLogsForPorts(logs, settings.groqApiKey, log);
+      const found = Object.entries(ports).filter(([, v]) => v != null);
+      if (found.length > 0) {
+        setDetectedPorts(app.id, ports);
+        log(`Ports saved: ${found.map(([k, v]) => `${k}=${String(v)}`).join(', ')}`);
+
+        // Offer to replace the configured port if frontend port differs
+        if (ports.frontend !== undefined && ports.frontend !== app.port) {
+          log(`Frontend port ${ports.frontend} differs from configured port ${app.port} — asking user...`);
+          const { response } = await dialog.showMessageBox({
+            type: 'question',
+            buttons: ['Replace', 'Keep current'],
+            defaultId: 0,
+            cancelId: 1,
+            title: 'Port Update',
+            message: `Replace port for "${app.name}"?`,
+            detail: `AI detected the frontend is running on port ${ports.frontend}, but the app is configured with port ${app.port}.\n\nReplace configured port with ${ports.frontend}?`,
+          });
+          if (response === 0) {
+            updateAppPort(app.id, ports.frontend);
+            log(`Port replaced: ${app.port} → ${ports.frontend}`);
+          } else {
+            log(`User kept current port ${app.port}`);
+          }
+        } else if (ports.frontend !== undefined) {
+          log(`Frontend port ${ports.frontend} matches configured port — no change needed`);
+        }
+      } else {
+        log('No ports detected in logs');
+      }
+    } catch (err) {
+      log(`Port detection failed: ${String(err)}`);
+    }
+  } else {
+    try {
+      log('--- Failure analysis ---');
+      const analysis = await analyzeFailure(logs, settings.groqApiKey, log);
+      aiAnalysisMap.set(app.id, analysis);
+      log(`Failure analysis saved`);
+    } catch (err) {
+      log(`Failure analysis failed: ${String(err)}`);
+    }
+  }
+
+  log('AI analysis complete');
+}
+
+function scheduleAiAnalysis(app: AppConfig): void {
+  setTimeout(() => { void doAiAnalysis(app); }, 20_000);
+}
+
+export async function reanalyzeApp(appId: string): Promise<void> {
+  const app = listApps().find(a => a.id === appId);
+  if (!app) throw new Error('App not found');
+  await doAiAnalysis(app);
 }
 
 export function startApp(appId: string): AppStatusInfo {
@@ -98,9 +204,7 @@ export function startApp(appId: string): AppStatusInfo {
   if (current.status === 'running') return current;
 
   if (portBound(app.port)) {
-    throw new Error(
-      `Port ${app.port} is already in use by another process (not started by us)`
-    );
+    throw new Error(`Port ${app.port} is already in use by another process (not started by us)`);
   }
 
   const logPath = logFilePath(appId);
@@ -120,15 +224,18 @@ export function startApp(appId: string): AppStatusInfo {
 
   if (!child.pid) throw new Error('Failed to spawn process');
 
-  // Child is now a session leader (detached + setsid via detached: true on Unix)
-  const pgid = child.pid; // with detached: true on Unix, child.pid is the pgid
+  const pgid = child.pid;
   child.unref();
+
+  aiAnalysisMap.delete(appId);
 
   setStateEntry(appId, {
     pid: child.pid,
     pgid,
     startedAt: new Date().toISOString(),
   });
+
+  scheduleAiAnalysis(app);
 
   return statusOf(app);
 }
@@ -139,7 +246,7 @@ async function sleep(ms: number): Promise<void> {
 
 async function killTreeAndWait(pgid: number, port: number): Promise<boolean> {
   try { process.kill(-pgid, 'SIGTERM'); } catch { /* may already be dead */ }
-  for (let i = 0; i < 25; i++) { // up to 5s
+  for (let i = 0; i < 25; i++) {
     await sleep(200);
     if (!portBound(port)) return true;
   }
@@ -172,9 +279,7 @@ export async function stopApp(appId: string): Promise<AppStatusInfo> {
   clearStateEntry(appId);
 
   if (!killed && portBound(app.port)) {
-    throw new Error(
-      `Port ${app.port} is still in use by another process we could not stop`
-    );
+    throw new Error(`Port ${app.port} is still in use by another process we could not stop`);
   }
 
   return statusOf(app);

@@ -1,14 +1,6 @@
-import type { AppConfig, AppStatusInfo } from '../global';
-
-interface Props {
-  apps: AppConfig[];
-  statuses: Record<string, AppStatusInfo>;
-  onOpen: (id: string) => void;
-  onInfo: (id: string) => void;
-  onStart: (id: string) => void;
-  onStop: (id: string) => void;
-  onDelete: (id: string) => void;
-}
+import { useState } from 'react';
+import type { AppConfig, AppStatusInfo, GroupConfig } from '../global';
+import GroupFolderTile from './GroupFolderTile';
 
 function gradientFor(name: string): string {
   let h = 0;
@@ -18,17 +10,85 @@ function gradientFor(name: string): string {
   return `linear-gradient(135deg, hsl(${h1} 70% 60%), hsl(${h2} 70% 55%))`;
 }
 
-export default function GridView({ apps, statuses, onOpen, onInfo, onStart, onStop, onDelete }: Props): JSX.Element {
+interface Props {
+  apps: AppConfig[];
+  statuses: Record<string, AppStatusInfo>;
+  groups: GroupConfig[];
+  onOpen: (id: string) => void;
+  onInfo: (id: string) => void;
+  onStart: (id: string) => void;
+  onStop: (id: string) => void;
+  onDelete: (id: string) => void;
+  onAddToGroup: (groupId: string, appId: string) => void;
+  onRemoveFromGroup: (groupId: string, appId: string) => void;
+  onStartGroup: (groupId: string) => void;
+  onStopGroup: (groupId: string) => void;
+  onDeleteGroup: (groupId: string) => void;
+}
+
+export default function GridView({
+  apps, statuses, groups,
+  onOpen, onInfo, onStart, onStop, onDelete,
+  onAddToGroup, onRemoveFromGroup, onStartGroup, onStopGroup, onDeleteGroup,
+}: Props): JSX.Element {
+  const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
+
+  const groupedAppIds = new Set(groups.flatMap(g => g.appIds));
+  const ungroupedApps = apps.filter(a => !groupedAppIds.has(a.id));
+
+  const handleDragStart = (e: React.DragEvent, appId: string) => {
+    e.dataTransfer.setData('appId', appId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, groupId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverGroupId(groupId);
+  };
+
+  const handleDrop = (e: React.DragEvent, groupId: string) => {
+    e.preventDefault();
+    setDragOverGroupId(null);
+    const appId = e.dataTransfer.getData('appId');
+    if (appId) onAddToGroup(groupId, appId);
+  };
+
+  const handleDragLeave = () => setDragOverGroupId(null);
+
   return (
-    <div className="grid">
-      {apps.map(app => {
+    <div className="grid" onDragLeave={handleDragLeave}>
+      {/* Group folder tiles */}
+      {groups.map(group => (
+        <GroupFolderTile
+          key={group.id}
+          group={group}
+          apps={apps}
+          statuses={statuses}
+          onOpen={onOpen}
+          onInfo={onInfo}
+          onStart={onStart}
+          onStop={onStop}
+          onRemoveFromGroup={onRemoveFromGroup}
+          onStartGroup={onStartGroup}
+          onStopGroup={onStopGroup}
+          onDeleteGroup={onDeleteGroup}
+          onDragOver={e => handleDragOver(e, group.id)}
+          onDrop={e => handleDrop(e, group.id)}
+          isDragOver={dragOverGroupId === group.id}
+        />
+      ))}
+
+      {/* Ungrouped app tiles */}
+      {ungroupedApps.map(app => {
         const st = statuses[app.id];
         const running = st?.status === 'running';
-        const stop = (e: React.MouseEvent) => e.stopPropagation();
         return (
           <div
             key={app.id}
             className="tile"
+            draggable
+            onDragStart={e => handleDragStart(e, app.id)}
             onClick={() => onOpen(app.id)}
             title={`${app.name} — port ${app.port}`}
           >
@@ -38,7 +98,7 @@ export default function GridView({ apps, statuses, onOpen, onInfo, onStart, onSt
             <div className="tile-name">{app.name}</div>
             <div className="tile-port">:{app.port}</div>
             <div className={`status-dot ${running ? 'running' : 'stopped'}`} />
-            <div className="tile-actions" onClick={stop}>
+            <div className="tile-actions" onClick={e => e.stopPropagation()}>
               {running ? (
                 <button onClick={() => onStop(app.id)} title="Stop" className="icon-btn">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>

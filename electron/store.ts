@@ -1,8 +1,14 @@
 import * as fs from 'fs';
 import { randomUUID } from 'crypto';
-import { appsJsonPath, stateJsonPath } from './paths';
+import { appsJsonPath, stateJsonPath, groupsJsonPath } from './paths';
 
 export type AppType = 'web' | 'desktop';
+
+export interface DetectedPorts {
+  rest?: number;
+  grpc?: number;
+  frontend?: number;
+}
 
 export interface AppConfig {
   id: string;
@@ -10,6 +16,14 @@ export interface AppConfig {
   command: string;
   port: number;
   appType: AppType;
+  createdAt: string;
+  detectedPorts?: DetectedPorts;
+}
+
+export interface GroupConfig {
+  id: string;
+  name: string;
+  appIds: string[];
   createdAt: string;
 }
 
@@ -90,6 +104,10 @@ export function deleteApp(id: string): void {
   const st = readState();
   delete st[id];
   writeState(st);
+  // Remove from any group
+  const groups = listGroups();
+  for (const g of groups) g.appIds = g.appIds.filter(aid => aid !== id);
+  saveGroups(groups);
 }
 
 export function readState(): StateMap {
@@ -110,4 +128,78 @@ export function clearStateEntry(id: string): void {
   const st = readState();
   delete st[id];
   writeState(st);
+}
+
+// --- Groups ---
+
+export function listGroups(): GroupConfig[] {
+  return readJson<GroupConfig[]>(groupsJsonPath(), []);
+}
+
+export function saveGroups(groups: GroupConfig[]): void {
+  writeJson(groupsJsonPath(), groups);
+}
+
+export function createGroup(name: string): GroupConfig {
+  if (!name.trim()) throw new Error('Group name is required');
+  const groups = listGroups();
+  const group: GroupConfig = {
+    id: randomUUID(),
+    name: name.trim(),
+    appIds: [],
+    createdAt: new Date().toISOString(),
+  };
+  groups.push(group);
+  saveGroups(groups);
+  return group;
+}
+
+export function deleteGroup(id: string): void {
+  saveGroups(listGroups().filter(g => g.id !== id));
+}
+
+export function addAppToGroup(groupId: string, appId: string): GroupConfig {
+  const groups = listGroups();
+  // Remove app from any existing group first (an app can only be in one group)
+  for (const g of groups) g.appIds = g.appIds.filter(id => id !== appId);
+  const group = groups.find(g => g.id === groupId);
+  if (!group) throw new Error('Group not found');
+  group.appIds.push(appId);
+  saveGroups(groups);
+  return group;
+}
+
+export function removeAppFromGroup(groupId: string, appId: string): GroupConfig {
+  const groups = listGroups();
+  const group = groups.find(g => g.id === groupId);
+  if (!group) throw new Error('Group not found');
+  group.appIds = group.appIds.filter(id => id !== appId);
+  saveGroups(groups);
+  return group;
+}
+
+export function renameGroup(id: string, name: string): GroupConfig {
+  if (!name.trim()) throw new Error('Group name is required');
+  const groups = listGroups();
+  const group = groups.find(g => g.id === id);
+  if (!group) throw new Error('Group not found');
+  group.name = name.trim();
+  saveGroups(groups);
+  return group;
+}
+
+export function setDetectedPorts(id: string, ports: DetectedPorts): void {
+  const apps = listApps();
+  const app = apps.find(a => a.id === id);
+  if (!app) return;
+  app.detectedPorts = ports;
+  saveApps(apps);
+}
+
+export function updateAppPort(id: string, port: number): void {
+  const apps = listApps();
+  const app = apps.find(a => a.id === id);
+  if (!app) return;
+  app.port = port;
+  saveApps(apps);
 }
