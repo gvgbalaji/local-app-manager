@@ -60,7 +60,7 @@ function parseAdd(argv: string[]): { name?: string; port?: number; cwd: string; 
   let port: number | undefined;
   let name: string | undefined;
   let cwd = process.cwd();
-  const cmd: string[] = [];
+  let cmd: string[] = [];
   let i = 0;
   let seenSep = false;
   while (i < argv.length) {
@@ -112,7 +112,21 @@ function cmdAdd(argv: string[]): void {
     process.stderr.write('Error: could not derive name; pass -n <name>\n');
     process.exit(2);
   }
-  const command = `cd ${JSON.stringify(cwd)} && ${cmd.join(' ')}`;
+
+  // Check if command likely needs quoting (contains shell operators as separate args)
+  const cmdStr = cmd.join(' ');
+  if ((cmd.includes('&&') || cmd.includes('||') || cmd.includes('|')) && cmd.length > 1) {
+    process.stderr.write(
+      `Warning: Your command contains shell operators (&&, ||, |) as separate arguments.\n` +
+      `This typically means you forgot to quote the command.\n\n` +
+      `Current command: ${cmdStr}\n\n` +
+      `If you intended to use these operators, please re-run with the command quoted:\n` +
+      `  local-app add -p ${port} -- "${cmdStr}"\n\n`
+    );
+    process.exit(2);
+  }
+
+  const command = `cd ${JSON.stringify(cwd)} && ${cmdStr}`;
   const apps = readApps();
   const portClash = apps.find(a => a.port === port);
   if (portClash) {

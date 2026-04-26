@@ -98,6 +98,10 @@ local-app add -p 5174 -n "Portfolio Web" -- npm run dev
 # Register a project without cd'ing into it
 local-app add -p 8000 -n portfolio-api -d ~/projects/gv-portfolio/portfolio-api -- bash start.sh
 
+# Commands with shell operators (&&, ||, pipes) must be quoted as a single argument
+local-app add -p 3000 -- "source env && npm run dev"
+local-app add -p 5000 -- "bash setup.sh && npm run dev && npm run seed"
+
 # List registered apps
 local-app list
 ```
