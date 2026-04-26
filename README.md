@@ -6,6 +6,8 @@ A tiny Electron desktop app for registering, starting, and stopping local develo
 
 ![Grid view](docs/screenshots/grid-view.png)
 
+![Settings dialog](docs/screenshots/settings-dialog.png)
+
 ## Features
 
 - Register any local app with a name, port, and shell command.
