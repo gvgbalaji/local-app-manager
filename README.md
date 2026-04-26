@@ -11,8 +11,11 @@ A tiny Electron desktop app for registering, starting, and stopping local develo
 ## Features
 
 - Register any local app with a name, port, and shell command.
+- App type support: mark apps as web or desktop; web apps open in your browser with one click.
 - Grid or list view, with inline start / stop / delete actions.
 - Live log tail per app (last 64 KB on open, streaming after that).
+- **AI Log Analysis**: 20 seconds after an app starts, AI reads the logs, detects ports and bound addresses, and diagnoses startup failures. Results stream into the log viewer.
+- **Multi-LLM support**: configure any LLM provider (Groq, OpenAI, Ollama, Mistral, Together AI, LiteLLM Proxy, or custom OpenAI-compatible endpoint) for log analysis.
 - Detached process groups — your dev servers keep running even if you close the manager.
 - PID-first, port-fallback, tree-kill stop logic so orphaned processes get cleaned up.
 - CLI companion (`local-app`) for one-line registration from any project directory.
