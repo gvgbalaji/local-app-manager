@@ -118,8 +118,8 @@ async function doAiAnalysis(app: AppConfig): Promise<void> {
     log('AI analysis skipped: AI is not enabled (enable in Settings)');
     return;
   }
-  if (!settings.groqApiKey) {
-    log('AI analysis skipped: Groq API key not configured (add in Settings)');
+  if (!settings.llmBaseUrl || !settings.llmModel) {
+    log('AI analysis skipped: LLM base URL or model not configured (check Settings)');
     return;
   }
 
@@ -139,14 +139,23 @@ async function doAiAnalysis(app: AppConfig): Promise<void> {
   if (current.status === 'running') {
     try {
       log('--- Port detection ---');
-      const ports = await analyzeLogsForPorts(logs, settings.groqApiKey, log);
+      const ports = await analyzeLogsForPorts(logs, settings, log);
       const found = Object.entries(ports).filter(([, v]) => v != null);
       if (found.length > 0) {
         setDetectedPorts(app.id, ports);
         log(`Ports saved: ${found.map(([k, v]) => `${k}=${String(v)}`).join(', ')}`);
 
-        // Offer to replace the configured port if frontend port differs
-        if (ports.frontend !== undefined && ports.frontend !== app.port) {
+        if (found.length === 1) {
+          // Single port detected — auto-replace silently if different
+          const detectedPort = found[0][1] as number;
+          if (detectedPort !== app.port) {
+            updateAppPort(app.id, detectedPort);
+            log(`Auto-replaced port: ${app.port} → ${detectedPort}`);
+          } else {
+            log(`Detected port ${detectedPort} matches configured port — no change needed`);
+          }
+        } else if (ports.frontend !== undefined && ports.frontend !== app.port) {
+          // Multiple ports detected — ask user only about the frontend port
           log(`Frontend port ${ports.frontend} differs from configured port ${app.port} — asking user...`);
           const { response } = await dialog.showMessageBox({
             type: 'question',
@@ -175,7 +184,7 @@ async function doAiAnalysis(app: AppConfig): Promise<void> {
   } else {
     try {
       log('--- Failure analysis ---');
-      const analysis = await analyzeFailure(logs, settings.groqApiKey, log);
+      const analysis = await analyzeFailure(logs, settings, log);
       aiAnalysisMap.set(app.id, analysis);
       log(`Failure analysis saved`);
     } catch (err) {

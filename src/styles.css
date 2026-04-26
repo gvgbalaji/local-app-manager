@@ -311,6 +311,7 @@ button.danger:hover:not(:disabled) { background: var(--red); color: white; }
 .ai-action { color: var(--text); }
 
 /* Settings dialog */
+.settings-modal { width: 480px; max-height: 80vh; overflow-y: auto; }
 .settings-section { display: flex; flex-direction: column; gap: 8px; }
 .settings-section-title { font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 600; letter-spacing: 0.05em; }
 .settings-toggle {
@@ -318,6 +319,18 @@ button.danger:hover:not(:disabled) { background: var(--red); color: white; }
   font-size: 14px; color: var(--text); cursor: pointer;
 }
 .settings-toggle input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+/* Provider grid */
+.provider-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px;
+}
+.provider-btn {
+  padding: 7px 10px; border-radius: 7px; font-size: 13px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--muted);
+  text-align: center; cursor: pointer; transition: border-color 0.15s, color 0.15s;
+}
+.provider-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); background: var(--bg); }
+.provider-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(137,180,250,0.08); font-weight: 600; }
 
 /* Toast */
 .toast {

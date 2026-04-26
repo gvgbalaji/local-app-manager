@@ -33,7 +33,10 @@ export interface AppStatusInfo {
 
 export interface Settings {
   aiEnabled: boolean;
-  groqApiKey: string;
+  llmProvider: string;
+  llmApiKey: string;
+  llmModel: string;
+  llmBaseUrl: string;
 }
 
 export interface Api {

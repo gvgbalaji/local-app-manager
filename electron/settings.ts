@@ -3,14 +3,33 @@ import { settingsJsonPath } from './paths';
 
 export interface Settings {
   aiEnabled: boolean;
-  groqApiKey: string;
+  llmProvider: string;
+  llmApiKey: string;
+  llmModel: string;
+  llmBaseUrl: string;
 }
 
-const defaults: Settings = { aiEnabled: false, groqApiKey: '' };
+const defaults: Settings = {
+  aiEnabled: false,
+  llmProvider: 'groq',
+  llmApiKey: '',
+  llmModel: 'llama-3.1-8b-instant',
+  llmBaseUrl: 'https://api.groq.com/openai/v1',
+};
 
 export function readSettings(): Settings {
   try {
-    return { ...defaults, ...(JSON.parse(fs.readFileSync(settingsJsonPath(), 'utf8')) as Partial<Settings>) };
+    const raw = JSON.parse(fs.readFileSync(settingsJsonPath(), 'utf8')) as Record<string, unknown>;
+    // Migrate from old { groqApiKey } format
+    if (typeof raw.groqApiKey === 'string' && !raw.llmApiKey) {
+      return {
+        ...defaults,
+        aiEnabled: Boolean(raw.aiEnabled),
+        llmProvider: 'groq',
+        llmApiKey: raw.groqApiKey,
+      };
+    }
+    return { ...defaults, ...(raw as Partial<Settings>) };
   } catch {
     return { ...defaults };
   }

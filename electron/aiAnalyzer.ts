@@ -1,81 +1,47 @@
-import * as https from 'https';
+import OpenAI from 'openai';
+import type { Settings } from './settings';
 
 type LogFn = (msg: string) => void;
 
-interface GroqResponse {
-  choices: Array<{ message: { content: string } }>;
-  error?: { message: string };
-}
-
 function stripAnsi(str: string): string {
-  // Remove ANSI escape codes (color, cursor, etc.)
   // eslint-disable-next-line no-control-regex
   return str.replace(/\x1B\[[0-9;]*[A-Za-z]/g, '').replace(/\x1B\][^\x07]*(\x07|\x1B\\)/g, '');
 }
 
-async function callGroq(apiKey: string, systemPrompt: string, userContent: string, log: LogFn): Promise<string> {
-  const cleanContent = stripAnsi(userContent).slice(-8000);
-  log(`Sending ${cleanContent.length} chars of (ANSI-stripped) logs to Groq...`);
-
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({
-      model: 'llama-3.1-8b-instant',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: cleanContent },
-      ],
-      max_tokens: 300,
-      temperature: 0.1,
-    });
-
-    const req = https.request(
-      {
-        hostname: 'api.groq.com',
-        path: '/openai/v1/chat/completions',
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body),
-        },
-      },
-      (res) => {
-        log(`Groq HTTP status: ${res.statusCode}`);
-        let data = '';
-        res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
-        res.on('end', () => {
-          try {
-            const parsed = JSON.parse(data) as GroqResponse;
-            if (parsed.error) {
-              const msg = `Groq API error: ${parsed.error.message}`;
-              log(msg);
-              reject(new Error(msg));
-              return;
-            }
-            const content = parsed.choices?.[0]?.message?.content ?? '';
-            log(`Groq raw response: ${content}`);
-            resolve(content);
-          } catch {
-            log(`Groq parse error. Raw response: ${data.slice(0, 500)}`);
-            reject(new Error(`Failed to parse Groq response`));
-          }
-        });
-      }
-    );
-    req.on('error', (err: Error) => {
-      log(`Groq network error: ${err.message}`);
-      reject(err);
-    });
-    req.write(body);
-    req.end();
+function createClient(s: Settings): OpenAI {
+  return new OpenAI({
+    apiKey: s.llmApiKey || 'no-key-needed',
+    baseURL: s.llmBaseUrl,
+    // Prevent the SDK from reading process.env.OPENAI_API_KEY
+    dangerouslyAllowBrowser: false,
   });
 }
 
+async function callLLM(s: Settings, systemPrompt: string, userContent: string, log: LogFn): Promise<string> {
+  const cleanContent = stripAnsi(userContent).slice(-8000);
+  log(`Calling ${s.llmProvider} (${s.llmModel}) with ${cleanContent.length} chars of log...`);
+
+  const client = createClient(s);
+  const response = await client.chat.completions.create({
+    model: s.llmModel,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: cleanContent },
+    ],
+    max_tokens: 300,
+    temperature: 0.1,
+  });
+
+  const content = response.choices[0]?.message?.content ?? '';
+  log(`Response: ${content}`);
+  return content;
+}
+
 function extractJson(text: string): Record<string, unknown> {
-  // Try to find a JSON object in the response, handling code fences
+  // Strip code fences, find first JSON object
   const clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
   const match = clean.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error(`No JSON object found in: ${text.slice(0, 200)}`);
+  if (!match) throw new Error(`No JSON found in: ${text.slice(0, 200)}`);
   return JSON.parse(match[0]) as Record<string, unknown>;
 }
 
@@ -90,13 +56,14 @@ export interface DetectedPorts {
   frontend?: number;
 }
 
-export async function analyzeLogsForPorts(logs: string, apiKey: string, log: LogFn): Promise<DetectedPorts> {
+export async function analyzeLogsForPorts(logs: string, settings: Settings, log: LogFn): Promise<DetectedPorts> {
   const system = `You are a log analyzer. Extract port numbers from application startup logs.
-Identify which ports are for: REST API server (rest), gRPC server (grpc), frontend/web server (frontend).
-Return ONLY a valid JSON object with no other text: {"rest": <number or null>, "grpc": <number or null>, "frontend": <number or null>}
-Use null when a port type is not found. Common patterns: "listening on port N", "server started on :N", "Local: http://localhost:N", "PORT=N".`;
+Identify ports for: REST API server (rest), gRPC server (grpc), frontend/web server (frontend).
+Return ONLY a valid JSON object, no other text: {"rest": <number or null>, "grpc": <number or null>, "frontend": <number or null>}
+Common log patterns: "listening on port N", "server started on :N", "Local: http://localhost:N", "PORT=N", "running at http://localhost:N".
+Use null when a port type is not found.`;
 
-  const result = await callGroq(apiKey, system, logs, log);
+  const result = await callLLM(settings, system, logs, log);
   try {
     const parsed = extractJson(result);
     const ports: DetectedPorts = {
@@ -112,13 +79,12 @@ Use null when a port type is not found. Common patterns: "listening on port N", 
   }
 }
 
-export async function analyzeFailure(logs: string, apiKey: string, log: LogFn): Promise<{ reason: string; action: string }> {
+export async function analyzeFailure(logs: string, settings: Settings, log: LogFn): Promise<{ reason: string; action: string }> {
   const system = `You are a log analyzer. These logs are from a service that failed to start.
 Identify the primary reason for failure and a specific corrective action.
-Return ONLY a valid JSON object: {"reason": "<brief reason>", "action": "<corrective action>"}
-Be concise. No other text outside the JSON.`;
+Return ONLY a valid JSON object, no other text: {"reason": "<brief reason>", "action": "<corrective action>"}`;
 
-  const result = await callGroq(apiKey, system, logs, log);
+  const result = await callLLM(settings, system, logs, log);
   try {
     const parsed = extractJson(result);
     return {
