@@ -1,13 +1,20 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, nativeImage } from 'electron';
 import * as path from 'path';
 import { registerIpc } from './ipc';
+
+app.setName('LocalAM');
 
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
+  const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
+  const icon = nativeImage.createFromPath(iconPath);
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    title: 'LocalAM',
+    icon,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
